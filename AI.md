@@ -268,10 +268,33 @@ less shadow certbot ca-certificates
 ├─ Load functions from /usr/local/etc/docker/functions/
 ├─ Set up environment variables
 ├─ Create /config and /data volumes
-├─ Run init scripts from /usr/local/etc/docker/init.d/
+├─ Run ALL init scripts from /usr/local/etc/docker/init.d/ (sorted order)
 ├─ Handle healthcheck command
 └─ Execute main application
 ```
+
+### Init.d Scripts — CRITICAL RULES
+
+**Each service in a repo gets its own numbered init.d script. Never merge or remove them.**
+
+- `__start_init_scripts` iterates and sources **every** `*.sh` file in `init.d/` in sort order.
+- Multi-process repos have **one script per service**. Example for `bind`:
+  ```
+  init.d/01-tor.sh       — Tor relay
+  init.d/02-named.sh     — BIND/named DNS server
+  init.d/03-nginx.sh     — nginx web front-end
+  init.d/04-php-fpm.sh   — PHP-FPM for web UI
+  ```
+- **Migration task = UPDATE each script to the canonical pattern, never delete services.**
+- The canonical pattern is `/.github/example/rootfs/usr/local/etc/docker/init.d/04-example.sh`.
+- Key checks every script must have:
+  - Correct PID sentinel: `if [ ! -f "/run/.start_init_scripts.pid" ]` (dot prefix, no double underscore)
+  - Source functions file before using any framework functions
+  - All hook functions defined: `__run_precopy`, `__execute_prerun`, `__run_pre_execute_checks`,
+    `__update_conf_files`, `__pre_execute`, `__post_execute`, `__pre_message`,
+    `__update_ssl_conf`, `__create_service_env`, `__run_start_script`, `__run_secure_function`
+  - `SERVICE_USES_PID='yes'` for long-running daemons, `'no'` for config-only steps
+  - `EXEC_CMD_BIN` set to the daemon binary path
 
 ### Volume Mounts
 
