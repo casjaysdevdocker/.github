@@ -1,6 +1,6 @@
 # 🐳 CasjaysDevDocker
 
-A curated collection of self-hostable Docker containers — all built on a standardised Alpine-based foundation, designed for simplicity, consistency, and easy self-hosting.
+A curated collection of self-hostable Docker containers — built on a standardised foundation supporting Alpine, Debian, Ubuntu, RHEL-compatible, and other base images, designed for simplicity, consistency, and easy self-hosting.
 
 ---
 
@@ -28,10 +28,10 @@ Every repository in this organisation is a single containerised application:
 
 ## 🏗️ How Containers Are Built
 
-All images follow the same two-stage pattern:
+All images follow the same two-stage pattern regardless of base distro:
 
-- **Stage 1** — Alpine bootstrap: install `bash`, `ca-certificates`, and update trust store
-- **Stage 2** — `FROM scratch`: copy the full Alpine rootfs, layer in the application, and configure via environment variables
+- **Stage 1** — distro bootstrap (Alpine, Debian, Ubuntu, RHEL-compatible, etc.): install `bash`, `ca-certificates`, and update trust store
+- **Stage 2** — `FROM scratch`: copy the full rootfs, layer in the application, and configure via environment variables
 
 Every container is generated and maintained using the **[gen-dockerfile](https://github.com/casjay-dotfiles/scripts)** tool, which produces consistent Dockerfiles, entrypoint scaffolding, and CI workflows across all repositories.
 
