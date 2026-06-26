@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-##@Version           :  202605131431-git
+##@Version           :  202606261238-git
 # @@Author           :  CasjaysDev
 # @@Contact          :  CasjaysDev <docker-admin@casjaysdev.pro>
-# @@License          :  MIT
+# @@License          :  WTFPL
 # @@Copyright        :  Copyright 2026 CasjaysDev
-# @@Created          :  Wed May 13 02:31:25 PM EDT 2026
+# @@Created          :  Fri Jun 26 12:38:35 PM EDT 2026
 # @@File             :  00-init.sh
 # @@Description      :  script to run init
 # @@Changelog        :  newScript
@@ -20,7 +20,7 @@
 # shellcheck disable=SC1001,SC1003,SC2001,SC2003,SC2016,SC2031,SC2090,SC2115,SC2120,SC2155,SC2199,SC2229,SC2317,SC2329
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set bash options
-set -o pipefail
+set -eo pipefail
 [ "$DEBUGGER" = "on" ] && echo "Enabling debugging" && set -x$DEBUGGER_OPTIONS
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set env variables
@@ -28,15 +28,13 @@ exitCode=0
 
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Predefined actions
-if [ -d "/usr/local/share/template-files/data" ]; then rm -Rf "/usr/local/share/template-files/data"/*; fi
-if [ -d "/usr/local/share/template-files/config" ]; then rm -Rf "/usr/local/share/template-files/config"/*; fi
-if [ -d "/usr/local/share/template-files/defaults" ]; then rm -Rf "/usr/local/share/template-files/defaults"/*; fi
+
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Main script
 
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set the exit code
-#exitCode=$?
+exitCode=$?
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 exit $exitCode
 # - - - - - - - - - - - - - - - - - - - - - - - - -

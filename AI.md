@@ -266,13 +266,6 @@ PHP_VERSION="system"
 NODE_VERSION="system"
 NODE_MANAGER="system"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-# Default directories (passed as ARGs into Dockerfile)
-WWW_ROOT_DIR="/usr/local/share/httpd/default"
-DEFAULT_FILE_DIR="/usr/local/share/template-files"
-DEFAULT_DATA_DIR="/usr/local/share/template-files/data"
-DEFAULT_CONF_DIR="/usr/local/share/template-files/config"
-DEFAULT_TEMPLATE_DIR="/usr/local/share/template-files/defaults"
-# - - - - - - - - - - - - - - - - - - - - - - - - -
 ENV_PACKAGES=""
 ```
 
@@ -338,7 +331,6 @@ Never use the old names in new `.env.scripts` files.
 | `PULL_URL` | Base image | `casjaysdev/alpine` |
 | `DISTRO_VERSION` | Base image tag | `${IMAGE_VERSION}` |
 | `WWW_ROOT_DIR` | Web root | `/usr/local/share/httpd/default` |
-| `DEFAULT_FILE_DIR` | Template files dir | `/usr/local/share/template-files` |
 
 ### Generated Dockerfile Structure
 

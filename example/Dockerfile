@@ -1,14 +1,10 @@
-# Docker image for example using the alpine template
-ARG IMAGE_NAME="example"
-ARG PHP_SERVER="example"
-ARG BUILD_DATE="202605131434"
+# Docker image for alpine using the alpine template
+ARG IMAGE_NAME="alpine"
+ARG PHP_SERVER="alpine"
+ARG BUILD_DATE="202606261238"
 ARG LANGUAGE="en_US.UTF-8"
 ARG TIMEZONE="America/New_York"
 ARG WWW_ROOT_DIR="/usr/local/share/httpd/default"
-ARG DEFAULT_FILE_DIR="/usr/local/share/template-files"
-ARG DEFAULT_DATA_DIR="/usr/local/share/template-files/data"
-ARG DEFAULT_CONF_DIR="/usr/local/share/template-files/config"
-ARG DEFAULT_TEMPLATE_DIR="/usr/local/share/template-files/defaults"
 ARG PATH="/usr/local/etc/docker/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 ARG USER="root"
@@ -20,11 +16,11 @@ ARG PHP_VERSION="system"
 ARG NODE_VERSION="system"
 ARG NODE_MANAGER="system"
 
-ARG IMAGE_REPO=".github/example"
+ARG IMAGE_REPO="casjaysdevdocker/alpine"
 ARG IMAGE_VERSION="latest"
 ARG CONTAINER_VERSION=""
 
-ARG PULL_URL="casjaysdev/alpine"
+ARG PULL_URL="alpine"
 ARG DISTRO_VERSION="${IMAGE_VERSION}"
 ARG BUILD_VERSION="${BUILD_DATE}"
 
@@ -42,10 +38,6 @@ ARG EXPOSE_PORTS
 ARG BUILD_VERSION
 ARG IMAGE_VERSION
 ARG WWW_ROOT_DIR
-ARG DEFAULT_FILE_DIR
-ARG DEFAULT_DATA_DIR
-ARG DEFAULT_CONF_DIR
-ARG DEFAULT_TEMPLATE_DIR
 ARG DISTRO_VERSION
 ARG NODE_VERSION
 ARG NODE_MANAGER
@@ -54,7 +46,7 @@ ARG PHP_SERVER
 ARG SHELL_OPTS
 ARG PATH
 
-ARG PACK_LIST=" "
+ARG PACK_LIST="bash-completion git curl wget sudo unzip iproute2 ssmtp openssl jq tzdata mailcap ncurses util-linux pciutils usbutils coreutils binutils findutils grep rsync zip tini py3-pip procps net-tools coreutils sed gawk grep attr findutils readline lsof less curl shadow ca-certificates "
 
 ENV ENV=~/.profile
 ENV SHELL="/bin/sh"
@@ -63,7 +55,7 @@ ENV TZ="${TIMEZONE}"
 ENV TIMEZONE="${TZ}"
 ENV LANG="${LANGUAGE}"
 ENV TERM="xterm-256color"
-ENV HOSTNAME="casjaysdevdocker-example"
+ENV HOSTNAME="casjaysdevdocker-alpine"
 
 USER ${USER}
 WORKDIR /root
@@ -72,11 +64,18 @@ COPY ./rootfs/. /
 
 RUN set -e; \
   echo "Updating the system and ensuring bash is installed"; \
-  pkmgr update;pkmgr install bash
+  pkmgr update;pkmgr install bash ca-certificates; \
+  update-ca-certificates
 
 RUN set -e; \
   echo "Setting up prerequisites"; \
-  true
+  apk --no-cache add bash; \
+  SH_CMD="$(which sh 2>/dev/null||command -v sh 2>/dev/null)"; \
+  BASH_CMD="$(which bash 2>/dev/null||command -v bash 2>/dev/null)"; \
+  [ -x "$BASH_CMD" ] && symlink "$BASH_CMD" "/bin/sh" || true; \
+  [ -x "$BASH_CMD" ] && symlink "$BASH_CMD" "/usr/bin/sh" || true; \
+  [ -x "$BASH_CMD" ] && [ "$SH_CMD" != "/bin/sh" ] && symlink "$BASH_CMD" "$SH_CMD" || true; \
+  [ -n "$BASH_CMD" ] && sed -i 's|root:x:.*|root:x:0:0:root:/root:'$BASH_CMD'|g' "/etc/passwd" || true
 
 ENV SHELL="/bin/bash"
 SHELL [ "/bin/bash", "-c" ]
@@ -85,13 +84,19 @@ COPY --from=gosu /usr/local/bin/gosu /usr/local/bin/gosu
 
 RUN echo "Initializing the system"; \
   $SHELL_OPTS; \
-  mkdir -p "${DEFAULT_DATA_DIR}" "${DEFAULT_CONF_DIR}" "${DEFAULT_TEMPLATE_DIR}" "/root/docker/setup" "/etc/profile.d"; \
+  mkdir -p "/root/docker/setup" "/etc/profile.d"; \
   if [ -f "/root/docker/setup/00-init.sh" ];then echo "Running the init script";/root/docker/setup/00-init.sh||{ echo "Failed to execute /root/docker/setup/00-init.sh" >&2 && exit 10; };echo "Done running the init script";fi; \
   echo ""
 
 RUN echo "Creating and editing system files "; \
   $SHELL_OPTS; \
-  [ -f "/root/.profile" ] || touch "/root/.profile"; \
+
+  rm -Rf "/etc/apk/repositories"; \
+  [ "$DISTRO_VERSION" = "latest" ] && DISTRO_VERSION="edge";[ "$DISTRO_VERSION" = "edge" ] || DISTRO_VERSION="v${DISTRO_VERSION}"; \
+  echo "http://dl-cdn.alpinelinux.org/alpine/${DISTRO_VERSION}/main" >>"/etc/apk/repositories"; \
+  echo "http://dl-cdn.alpinelinux.org/alpine/${DISTRO_VERSION}/community" >>"/etc/apk/repositories"; \
+  if [ "${DISTRO_VERSION}" = "edge" ]; then echo "http://dl-cdn.alpinelinux.org/alpine/${DISTRO_VERSION}/testing" >>"/etc/apk/repositories";fi; \
+  apk update; apk upgrade --no-cache; \
   if [ -f "/root/docker/setup/01-system.sh" ];then echo "Running the system script";/root/docker/setup/01-system.sh||{ echo "Failed to execute /root/docker/setup/01-system.sh" >&2 && exit 10; };echo "Done running the system script";fi; \
   echo ""
 
@@ -194,10 +199,6 @@ ARG BUILD_VERSION
 ARG IMAGE_VERSION
 ARG GIT_COMMIT
 ARG WWW_ROOT_DIR
-ARG DEFAULT_FILE_DIR
-ARG DEFAULT_DATA_DIR
-ARG DEFAULT_CONF_DIR
-ARG DEFAULT_TEMPLATE_DIR
 ARG DISTRO_VERSION
 ARG NODE_VERSION
 ARG NODE_MANAGER
@@ -219,12 +220,12 @@ LABEL org.opencontainers.image.authors="${LICENSE}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.version="${BUILD_VERSION}"
 LABEL org.opencontainers.image.schema-version="${BUILD_VERSION}"
-LABEL org.opencontainers.image.url="https://docker.io/.github/example"
-LABEL org.opencontainers.image.source="https://docker.io/.github/example"
+LABEL org.opencontainers.image.url="https://docker.io/casjaysdevdocker/alpine"
+LABEL org.opencontainers.image.source="https://docker.io/casjaysdevdocker/alpine"
 LABEL org.opencontainers.image.vcs-type="Git"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
-LABEL org.opencontainers.image.source="https://github.com/.github/example"
-LABEL org.opencontainers.image.documentation="https://github.com/.github/example"
+LABEL org.opencontainers.image.source="https://github.com/casjaysdevdocker/alpine"
+LABEL org.opencontainers.image.documentation="https://github.com/casjaysdevdocker/alpine"
 LABEL com.github.containers.toolbox="false"
 
 ENV ENV=~/.bashrc
