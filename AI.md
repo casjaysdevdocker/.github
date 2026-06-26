@@ -178,7 +178,7 @@ gen-dockerfile --dir ./myapp actions
 | `--pkmgr` | Generate `pkmgr` script only and exit |
 | `--apache` | Add Apache2 packages + setup |
 | `--nginx` | Add nginx packages + setup |
-| `--mysql` / `--mariadb` | Add MariaDB packages + setup |
+| `--mysql` | Add MariaDB packages + setup (`--mariadb` is handled in the case block but not registered in getopt — use `--mysql`) |
 | `--postgres` | Add PostgreSQL packages + setup |
 | `--php` | Add PHP packages + setup |
 | `--application <name>` | Add a templatemgr application install step |
@@ -378,7 +378,7 @@ ENV TERM="xterm-256color"
 ENV HOSTNAME="casjaysdevdocker-${IMAGE_NAME}"
 
 COPY ./rootfs/. /
-RUN pkmgr update; pkmgr install bash
+RUN pkmgr update; pkmgr install bash ca-certificates; update-ca-certificates
 
 ENV SHELL="/bin/bash"
 SHELL ["/bin/bash", "-c"]
@@ -446,16 +446,16 @@ LABEL org.opencontainers.image.authors="${LICENSE}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.version="${BUILD_VERSION}"
 LABEL org.opencontainers.image.schema-version="${BUILD_VERSION}"
-LABEL org.opencontainers.image.url="https://hub.docker.com/r/casjaysdevdocker/${IMAGE_NAME}"
-LABEL org.opencontainers.image.source="https://hub.docker.com/r/casjaysdevdocker/${IMAGE_NAME}"
+LABEL org.opencontainers.image.url="${GEN_DOCKERFILE_HUB_REPO}"
+LABEL org.opencontainers.image.source="${GEN_DOCKERFILE_HUB_REPO}"
 LABEL org.opencontainers.image.vcs-type="Git"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
-LABEL org.opencontainers.image.source="https://github.com/casjaysdevdocker/${IMAGE_NAME}"
-LABEL org.opencontainers.image.documentation="https://github.com/casjaysdevdocker/${IMAGE_NAME}"
+LABEL org.opencontainers.image.source="${GEN_DOCKERFILE_GIT_REPO}"
+LABEL org.opencontainers.image.documentation="${GEN_DOCKERFILE_GIT_REPO}"
 LABEL com.github.containers.toolbox="false"
 ```
 
-> **Note:** `org.opencontainers.image.source` appears twice intentionally — first set to the Docker Hub URL, then overridden to the Git source URL. The second value wins at runtime.
+> **Note:** `org.opencontainers.image.source` appears twice intentionally — first set to `GEN_DOCKERFILE_HUB_REPO` (computed from `ENV_REGISTRY_URL`/`ENV_REGISTRY_PUSH`), then overridden to `GEN_DOCKERFILE_GIT_REPO` (the Git remote URL). The second value wins at runtime. Neither URL is hardcoded — they reflect whatever registry and org the project is configured for.
 
 ---
 
@@ -563,7 +563,7 @@ RUNAS_USER="root"
 
 ### Required Hook Functions in Every Init.d Script
 
-All eight must be defined (even if they just `return 0`):
+All eleven must be defined (even if they just `return 0`):
 
 ```bash
 __run_precopy()              # runs before copying /config to /etc
