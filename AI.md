@@ -127,7 +127,7 @@ project-name/
 
 ## gen-dockerfile Tool
 
-All containers are built using the **gen-dockerfile** tool (`bin/gen-dockerfile` in casjay-dotfiles). It generates standardised Dockerfiles, `.env.scripts`, workflow YAML, `pkmgr` scripts, and `rootfs/` scaffolding.
+All containers are built using the **gen-dockerfile** tool. It generates standardised Dockerfiles, `.env.scripts`, workflow YAML, `pkmgr` scripts, and `rootfs/` scaffolding.
 
 ### Usage
 
@@ -201,7 +201,7 @@ Creates `.gitea/workflows/build.yml` (or `build.$version.yml` for versioned tags
 Templates are loaded from the first match:
 
 1. `$GEN_DOCKERFILE_CONFIG_DIR/templates/<name>.template` (user override)
-2. `$CASJAYSDEVDIR/templates/dockerfiles/<name>.template` (installed scripts tree)
+2. `/usr/local/share/CasjaysDev/scripts/templates/dockerfiles/<name>.template` (installed; also `$CASJAYSDEVDIR/templates/dockerfiles/` when running from a dev checkout)
 
 `template_options.source` is sourced after `__set_variables` runs, allowing template-specific variable overrides.
 
@@ -822,6 +822,6 @@ gen-dockerfile --dir ./myapp actions
 
 - **Docker Hub:** <https://hub.docker.com/u/casjaysdevdocker>
 - **Git Repository:** <https://github.com/casjaysdevdocker>
-- **gen-dockerfile Tool:** `/usr/local/bin/gen-dockerfile` (source: `casjay-dotfiles/scripts/bin/gen-dockerfile`)
-- **Template Source:** `casjay-dotfiles/scripts/templates/dockerfiles/`
+- **gen-dockerfile Tool:** `/usr/local/bin/gen-dockerfile`
+- **Template Source:** `/usr/local/share/CasjaysDev/scripts/templates/dockerfiles/` (installed) or `$CASJAYSDEVDIR/templates/dockerfiles/` (dev override)
 - **Example Project:** `casjaysdevdocker/.github/example/` (org-level repository — not present in individual container repos)
