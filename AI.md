@@ -148,11 +148,11 @@ gen-dockerfile --dir ./myapp actions
 | `debian` | Debian | `debian` |
 | `ubuntu` | Ubuntu | `ubuntu` |
 | `rhel` / `almalinux` / `rockylinux` / `centos` / `oraclelinux` / `redhat` | AlmaLinux/RHEL family | `almalinux` |
-| `web` | `casjaysdev/web` build stage (pre-built xorg + web packages) + scratch final image; default ports `5800`/`5900` | `casjaysdev/web` |
-| `xorg` | `casjaysdev/xorg` build stage (pre-built xorg packages) + scratch final image | `casjaysdev/xorg` |
+| `web` | Adds `xorg` + `x11-apps` packages on top of the build stage; scratch final image | `casjaysdev/web` (exists) — override via `ENV_PULL_URL` |
+| `xorg` | Adds `xorg` + `x11-apps` packages on top of the build stage; scratch final image | `casjaysdev/xorg` (**does not exist**) — must set `ENV_PULL_URL` |
 | `scratch` | Scratch final image only (pair with any build template) | N/A |
 
-> **Note:** The pull source is the base image pulled for the **build stage**. All templates produce a `FROM scratch` final stage. For standard distros (`alpine`, `debian`, `ubuntu`, `rhel`, `arch`), the pull source is the official upstream image. For `web` and `xorg`, the pull source is a pre-built casjaysdev image that already includes xorg; specify `--distro-name` to override.
+> **Note:** The pull source is the base image pulled for the **build stage**. All templates produce a `FROM scratch` final stage. For standard distros (`alpine`, `debian`, `ubuntu`, `rhel`, `arch`), the pull source is the official upstream image. For `web` and `xorg`, gen-dockerfile defaults to `casjaysdev/<template>` when no `ENV_PULL_URL` is set — `casjaysdev/web` exists on Docker Hub; `casjaysdev/xorg` does not. Always set `ENV_PULL_URL` in `.env.scripts` for `xorg` projects.
 
 ### CLI Flags
 
