@@ -273,7 +273,7 @@ NODE_VERSION="system"
 NODE_MANAGER="system"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Default directories
-WWW_ROOT_DIR="${WWW_ROOT_DIR:-/usr/local/share/httpd/default}"
+WWW_ROOT_DIR="/usr/local/share/httpd/default"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 ENV_PACKAGES=""
 ```
