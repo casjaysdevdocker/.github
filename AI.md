@@ -561,23 +561,40 @@ DATABASE_SERVICE_TYPE="sqlite" # custom|sqlite|redis|postgres|mariadb|mysql|couc
 RUNAS_USER="root"
 ```
 
-### Required Hook Functions in Every Init.d Script
+### Hook Functions in Every Init.d Script
 
-All eleven must be defined (even if they just `return 0`):
+The `start-service` template **generates all eleven hook functions** fully implemented inside each init.d script — they are not stubs the developer writes from scratch. The developer customises behaviour via a matching `*_local()` variant that each outer hook calls automatically if defined.
+
+**Outer hooks** (generated, do not redefine):
 
 ```bash
 __run_precopy()              # runs before copying /config to /etc
-__execute_prerun()           # runs before service starts
-__run_pre_execute_checks()   # validation before exec; non-zero aborts start
-__update_conf_files()        # update config files (sed replacements, etc.)
+__execute_prerun()           # custom prerun — e.g. set up WWW_ROOT_DIR
+__run_pre_execute_checks()   # validation before exec; non-zero exitStatus aborts start
+__update_conf_files()        # runs sed replacements on config files
 __pre_execute()              # final setup before exec
 __post_execute()             # background post-start tasks
-__pre_message()              # message to show before exec
+__pre_message()              # message shown before exec
 __update_ssl_conf()          # SSL certificate setup
 __create_service_env()       # generates /config/env/$SERVICE_NAME.sh template
-__run_start_script()         # builds and runs the exec script
+__run_start_script()         # builds and executes the service start command
 __run_secure_function()      # chmod 600 on credential files
 ```
+
+**`*_local()` stubs** (customise these — defined as `{ true; }` by default):
+
+```bash
+__run_precopy_local()
+__execute_prerun_local()
+__run_pre_execute_checks_local()
+__update_conf_files_local()    # ← put sed/config replacements here
+__pre_execute_local()
+__post_execute_local()
+__pre_message_local()
+__update_ssl_conf_local()
+```
+
+Each outer hook checks `builtin type -t __<name>_local | grep -q 'function'` before calling the local variant, so stubs that are never overridden cost nothing.
 
 ### PID Sentinel Check (CRITICAL)
 
