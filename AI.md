@@ -85,18 +85,19 @@ Each project directory contains:
 
 ```
 project-name/
-├── .dockerignore          # Docker build exclusions
-├── .env.scripts           # Environment variables for gen-dockerfile
-├── .git/                  # Git repository
-├── .gitattributes         # Git attributes
-├── .gitea/workflows/      # CI/CD workflows (Gitea Actions)
-│   └── docker.yaml        # Build and push workflow
-├── .gitignore             # Git ignore patterns
-├── Dockerfile             # Container build definition
-├── LICENSE.md             # License information
-├── README.md              # Project documentation
-└── rootfs/                # Container filesystem overlay
-    ├── root/docker/setup/ # Build-time setup scripts
+├── .dockerignore              # [generated] Docker build exclusions
+├── .env.scripts               # [generated] Environment variables for gen-dockerfile
+├── .git/                      # Git repository
+├── .gitattributes             # [generated] Git attributes
+├── .gitea/workflows/
+│   ├── docker.yaml            # [hand-crafted] Legacy CI workflow — do not overwrite
+│   └── build.yml              # [generated] by gen-dockerfile actions — regenerate freely
+├── .gitignore                 # [generated] Git ignore patterns
+├── Dockerfile                 # [generated] Container build definition
+├── LICENSE.md                 # License information
+├── README.md                  # [generated] Project documentation
+└── rootfs/                    # Container filesystem overlay
+    ├── root/docker/setup/     # [generated] Build-time setup scripts
     │   ├── 00-init.sh
     │   ├── 01-system.sh
     │   ├── 02-packages.sh
@@ -107,17 +108,20 @@ project-name/
     │   └── 07-cleanup.sh
     └── usr/local/
         ├── bin/
-        │   ├── entrypoint.sh      # Container entrypoint
-        │   └── pkmgr              # Package manager wrapper
+        │   ├── entrypoint.sh      # [generated] Container entrypoint
+        │   └── pkmgr              # [generated] Package manager wrapper
         ├── etc/docker/
         │   ├── functions/
-        │   │   └── entrypoint.sh  # Entrypoint functions
-        │   └── init.d/            # Runtime init scripts
-        └── share/template-files/
-            ├── config/            # Configuration templates
-            ├── data/              # Default data
-            └── defaults/          # Default files
+        │   │   └── entrypoint.sh  # [generated] Entrypoint functions
+        │   └── init.d/            # [hand-crafted] Runtime init scripts (one per service)
+        └── share/template-files/  # [hand-crafted] Config/data templates
+            ├── config/
+            ├── data/
+            └── defaults/
 ```
+
+**`[generated]`** — safe to overwrite with `gen-dockerfile --update`; changes will be lost on next regeneration.  
+**`[hand-crafted]`** — must not be overwritten by gen-dockerfile; customised per container.
 
 ---
 
@@ -137,16 +141,18 @@ gen-dockerfile --dir ./myapp actions
 
 ### Templates (positional argument or `--template`)
 
-| Template | Description | Base image |
-|----------|-------------|------------|
-| `alpine` | Default Alpine Linux (default) | `casjaysdev/alpine` |
-| `arch` / `archlinux` | Arch Linux | `menci/archlinuxarm` |
+| Template | Description | Pull source (build stage) |
+|----------|-------------|--------------------------|
+| `alpine` | Alpine Linux (default) | `alpine` (Docker Hub official) |
+| `arch` / `archlinux` | Arch Linux ARM | `menci/archlinuxarm` |
 | `debian` | Debian | `debian` |
 | `ubuntu` | Ubuntu | `ubuntu` |
-| `rhel` / `almalinux` / `rockylinux` / `centos` | AlmaLinux/RHEL family | `almalinux` |
-| `web` | Alpine + xorg + x11-apps | scratch/web template |
-| `xorg` | Alpine + xorg | xorg template |
-| `scratch` | Scratch-based | scratch template |
+| `rhel` / `almalinux` / `rockylinux` / `centos` / `oraclelinux` / `redhat` | AlmaLinux/RHEL family | `almalinux` |
+| `web` | Debian-based build stage + xorg + web packages; final image is scratch | Debian |
+| `xorg` | Debian-based build stage + xorg packages; final image is scratch | Debian |
+| `scratch` | Scratch final image only (pair with any build template) | N/A |
+
+> **Note:** The pull source is the base image pulled for the **build stage**. All templates produce a `FROM scratch` final stage. The casjaysdev registry images (`casjaysdev/alpine`, `casjaysdev/debian`, etc.) are the **push/output** targets, not the pull source.
 
 ### CLI Flags
 
@@ -250,7 +256,7 @@ ENV_ADD_IMAGE_PUSH=""
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Pull Configuration
 # ENV_PULL_URL: Source image to pull from (base image)
-ENV_PULL_URL="casjaysdev/alpine"
+ENV_PULL_URL="alpine"
 # ENV_DISTRO_TAG: Tag for the pull source image
 ENV_DISTRO_TAG="${IMAGE_VERSION}"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -265,6 +271,9 @@ LANG_VERSION=""
 PHP_VERSION="system"
 NODE_VERSION="system"
 NODE_MANAGER="system"
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+# Default directories
+WWW_ROOT_DIR="${WWW_ROOT_DIR:-/usr/local/share/httpd/default}"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 ENV_PACKAGES=""
 ```
@@ -288,7 +297,9 @@ ENV_PACKAGES=""
 | `ENV_VENDOR` / `ENV_AUTHOR` / `ENV_MAINTAINER` | Label metadata |
 | `SERVICE_PORT` | Primary exposed port |
 | `EXPOSE_PORTS` | Additional exposed ports |
+| `LANG_VERSION` | Language runtime version (go, php, rust, ruby, etc.) |
 | `PHP_VERSION` / `NODE_VERSION` / `NODE_MANAGER` | Runtime versions |
+| `WWW_ROOT_DIR` | Web root directory (default: `/usr/local/share/httpd/default`) |
 | `DOCKER_ENTYPOINT_PORTS_WEB` | Web ports passed to entrypoint |
 | `DOCKER_ENTYPOINT_PORTS_SRV` | Service ports passed to entrypoint |
 | `DOCKER_ENTYPOINT_HEALTH_APPS` | Apps to health-check |
@@ -313,24 +324,39 @@ Never use the old names in new `.env.scripts` files.
 
 ### Build Arguments
 
+Top-of-file ARGs (before any `FROM`):
+
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `IMAGE_NAME` | Container name | (from `ENV_REGISTRY_REPO`) |
-| `IMAGE_REPO` | Full push path `org/repo` | (computed) |
-| `IMAGE_VERSION` | Image version | `latest` |
+| `PHP_SERVER` | PHP server name | (same as `IMAGE_NAME`) |
 | `BUILD_DATE` | Build timestamp | YYYYMMDDHHMM |
-| `BUILD_VERSION` | Build version (same as BUILD_DATE) | YYYYMMDDHHMM |
-| `GIT_COMMIT` | Git SHA at build time | (from CI) |
 | `LANGUAGE` | System locale | `en_US.UTF-8` |
 | `TIMEZONE` | System timezone | `America/New_York` |
+| `WWW_ROOT_DIR` | Web root | `/usr/local/share/httpd/default` |
+| `PATH` | System `PATH` | `/usr/local/etc/docker/bin:/usr/local/sbin:...` |
+| `USER` | Build user | `root` |
+| `SHELL_OPTS` | Shell options | `set -e -o pipefail` |
 | `SERVICE_PORT` | Primary service port | (from `.env.scripts`) |
 | `EXPOSE_PORTS` | Additional ports | (from `.env.scripts`) |
 | `PHP_VERSION` | PHP version | `system` |
 | `NODE_VERSION` | Node.js version | `system` |
 | `NODE_MANAGER` | Node manager | `system` |
-| `PULL_URL` | Base image | `casjaysdev/alpine` |
+| `IMAGE_REPO` | Full push path `org/repo` | (computed) |
+| `IMAGE_VERSION` | Image version | `latest` |
+| `CONTAINER_VERSION` | Additional image tags | (computed) |
+| `PULL_URL` | Base image to pull | `alpine` (official Docker Hub) |
 | `DISTRO_VERSION` | Base image tag | `${IMAGE_VERSION}` |
-| `WWW_ROOT_DIR` | Web root | `/usr/local/share/httpd/default` |
+| `BUILD_VERSION` | Build version alias | `${BUILD_DATE}` |
+
+Stage 2 (`FROM scratch`) additional ARGs:
+
+| Argument | Description |
+|----------|-------------|
+| `TZ` | Timezone alias |
+| `GIT_COMMIT` | Git SHA at build time (from CI) |
+| `LICENSE` | Image license | default `WTFPL` |
+| `ENV_PORTS` | Alias for `${EXPOSE_PORTS}` |
 
 ### Generated Dockerfile Structure
 
@@ -342,9 +368,11 @@ FROM ${PULL_URL}:${DISTRO_VERSION} AS build
 
 # ... ARG declarations ...
 
+ENV ENV=~/.profile
 ENV SHELL="/bin/sh"
 ENV PATH="${PATH}"
 ENV TZ="${TIMEZONE}"
+ENV TIMEZONE="${TZ}"
 ENV LANG="${LANGUAGE}"
 ENV TERM="xterm-256color"
 ENV HOSTNAME="casjaysdevdocker-${IMAGE_NAME}"
@@ -374,13 +402,24 @@ FROM scratch
 
 # ... ARG and LABEL declarations ...
 
-ENV SHELL="/bin/bash"
+ENV ENV=~/.bashrc
+ENV USER="${USER}"
+ENV PATH="${PATH}"
 ENV TZ="${TIMEZONE}"
+ENV SHELL="/bin/bash"
+ENV TIMEZONE="${TZ}"
 ENV LANG="${LANGUAGE}"
 ENV TERM="xterm-256color"
 ENV PORT="${SERVICE_PORT}"
-ENV HOSTNAME="casjaysdev-${IMAGE_NAME}"
+ENV ENV_PORTS="${ENV_PORTS}"
 ENV CONTAINER_NAME="${IMAGE_NAME}"
+ENV HOSTNAME="casjaysdev-${IMAGE_NAME}"
+ENV PHP_SERVER="${PHP_SERVER}"
+ENV NODE_VERSION="${NODE_VERSION}"
+ENV NODE_MANAGER="${NODE_MANAGER}"
+ENV PHP_VERSION="${PHP_VERSION}"
+ENV DISTRO_VERSION="${IMAGE_VERSION}"
+ENV WWW_ROOT_DIR="${WWW_ROOT_DIR}"
 
 COPY --from=build /. /
 
@@ -402,12 +441,21 @@ LABEL org.opencontainers.image.vendor="CasjaysDev"
 LABEL org.opencontainers.image.authors="CasjaysDev"
 LABEL org.opencontainers.image.description="Containerized version of ${IMAGE_NAME}"
 LABEL org.opencontainers.image.title="${IMAGE_NAME}"
+LABEL org.opencontainers.image.base.name="${IMAGE_NAME}"
+LABEL org.opencontainers.image.authors="${LICENSE}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.version="${BUILD_VERSION}"
+LABEL org.opencontainers.image.schema-version="${BUILD_VERSION}"
+LABEL org.opencontainers.image.url="https://hub.docker.com/r/casjaysdevdocker/${IMAGE_NAME}"
+LABEL org.opencontainers.image.source="https://hub.docker.com/r/casjaysdevdocker/${IMAGE_NAME}"
+LABEL org.opencontainers.image.vcs-type="Git"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
 LABEL org.opencontainers.image.source="https://github.com/casjaysdevdocker/${IMAGE_NAME}"
 LABEL org.opencontainers.image.documentation="https://github.com/casjaysdevdocker/${IMAGE_NAME}"
-LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL com.github.containers.toolbox="false"
 ```
+
+> **Note:** `org.opencontainers.image.source` appears twice intentionally — first set to the Docker Hub URL, then overridden to the Git source URL. The second value wins at runtime.
 
 ---
 
@@ -419,7 +467,7 @@ Standard packages included in most containers (Alpine template):
 bash-completion git curl wget sudo unzip iproute2 ssmtp openssl jq tzdata
 mailcap ncurses util-linux pciutils usbutils coreutils binutils findutils
 grep rsync zip tini py3-pip procps net-tools sed gawk attr readline lsof
-less shadow certbot ca-certificates
+less shadow ca-certificates
 ```
 
 ---
@@ -568,79 +616,115 @@ USER_FILE_PREFIX="/config/secure/auth/user"
 
 ## CI/CD Integration
 
-### Gitea Actions Workflow
+### Two Workflow Files — Hand-Crafted vs Generated
 
-Located at `.gitea/workflows/docker.yaml` (canonical example). Key structure:
+| File | Origin | Never overwrite? |
+|------|--------|-----------------|
+| `.gitea/workflows/docker.yaml` | Hand-crafted legacy file kept in `.github/example/` | Yes — do not overwrite |
+| `.gitea/workflows/build.yml` | Generated by `gen-dockerfile actions` | No — regenerate freely |
+
+### Generated Workflow (`gen-dockerfile actions`)
+
+`gen-dockerfile actions` writes `.gitea/workflows/build.yml` (or `build.<version>.yml` for versioned tags) from the current `Dockerfile`. All actions are SHA-pinned.
+
+**Triggers:** `push` to `main`, monthly schedule (`cron: '0 2 1 * *'`), `workflow_dispatch`.
+
+**Registry strategy:**
+- Always logs in to the Gitea registry using the auto-provided `GITEA_TOKEN`.
+- Conditionally logs in to Docker Hub (or another registry) when `vars.DOCKER_USERNAME` is set; credentials via `vars.DOCKER_USERNAME` + `secrets.DOCKER_PASSWORD`.
+- `vars.DOCKER_REGISTRY` overrides the registry URL (default: `docker.io`).
+- `vars.DOCKER_ORG` overrides the namespace (fallback: `vars.DOCKER_USERNAME`).
+
+**`build-args` passed:** only `BUILD_DATE`, `GIT_COMMIT`, `BUILD_VERSION` — not `TIMEZONE`, `LANGUAGE`, `LICENSE`, or `TZ`.
+
+**Tags pushed:** `<yymm>` and `latest` to both Gitea and (if configured) Docker Hub.
 
 ```yaml
-name: example
-on: push
+name: Build and Push
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 2 1 * *'
+  workflow_dispatch:
 
 jobs:
-  release-example:
-    runs-on: act_runner
-    container:
-      image: catthehacker/ubuntu:act-latest
-    env:
-      RUNNER_TOOL_CACHE: /toolcache
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
-      - name: Get Meta
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Compute build metadata
         id: meta
         run: |
-          repo_version="$(git describe --tags --always)"
-          repo_version="${repo_version#v}"
-          docker_org="${GITHUB_REPOSITORY%%/*}"
-          repo_name="${GITHUB_REPOSITORY#*/}"
-          repo_name="${repo_name#docker-}"
-          docker_tag="${DOCKER_TAG:-latest}"
-          docker_hub="${DOCKER_HUB:-docker.io}"
-          printf 'DATE_TAG=%s\n' "$(date +'%y%m')" >> "$GITHUB_OUTPUT"
-          printf 'REPO_VERSION=%s\n' "$repo_version" >> "$GITHUB_OUTPUT"
-          printf 'DOCKER_ORG=%s\n' "$docker_org" >> "$GITHUB_OUTPUT"
-          printf 'DOCKER_TAG=%s\n' "$docker_tag" >> "$GITHUB_OUTPUT"
-          printf 'DOCKER_HUB=%s\n' "$docker_hub" >> "$GITHUB_OUTPUT"
-          printf 'REPO_NAME=%s\n' "$repo_name" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+          echo "tag_yymm=$(date -u +%y%m)" >> "$GITHUB_OUTPUT"
+          echo "git_commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "registry_host=$(echo '${{ github.server_url }}' | sed 's|https://||')" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Docker BuildX
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
+      - name: Login to Gitea registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
-          password: ${{ secrets.DOCKER_TOKEN }}
-          username: ${{ secrets.DOCKER_USERNAME }}
-          registry: ${{ steps.meta.outputs.DOCKER_HUB }}
+          registry: ${{ steps.meta.outputs.registry_host }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITEA_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: vars.DOCKER_USERNAME != ''
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.DOCKER_REGISTRY || 'docker.io' }}
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          file: ./Dockerfile
-          platforms: |
-            linux/amd64
-            linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
-          build-args: |
-            IMAGE_NAME=${{ steps.meta.outputs.REPO_NAME }}
-            BUILD_DATE=$(date -u +'%Y%m%d%H%M')
-            BUILD_VERSION=$(date -u +'%Y%m%d%H%M')
-            GIT_COMMIT=${{ github.sha }}
-            TIMEZONE=America/New_York
-            LANGUAGE=en_US.UTF-8
-            LICENSE=WTFPL
-            TZ=America/New_York
           tags: |
-            ${{ steps.meta.outputs.DOCKER_HUB }}/${{ steps.meta.outputs.DOCKER_ORG }}/${{ steps.meta.outputs.REPO_NAME }}:${{ steps.meta.outputs.DATE_TAG }}
-            ${{ steps.meta.outputs.DOCKER_HUB }}/${{ steps.meta.outputs.DOCKER_ORG }}/${{ steps.meta.outputs.REPO_NAME }}:${{ steps.meta.outputs.DOCKER_TAG }}
+            ${{ steps.meta.outputs.registry_host }}/${{ github.repository }}:${{ steps.meta.outputs.tag_yymm }}
+            ${{ vars.DOCKER_USERNAME != '' && format('{0}/{1}/{2}:{3}', vars.DOCKER_REGISTRY || 'docker.io', vars.DOCKER_ORG || vars.DOCKER_USERNAME, github.event.repository.name, steps.meta.outputs.tag_yymm) || '' }}
+            ${{ steps.meta.outputs.registry_host }}/${{ github.repository }}:latest
+            ${{ vars.DOCKER_USERNAME != '' && format('{0}/{1}/{2}:{3}', vars.DOCKER_REGISTRY || 'docker.io', vars.DOCKER_ORG || vars.DOCKER_USERNAME, github.event.repository.name, 'latest') || '' }}
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+            GIT_COMMIT=${{ steps.meta.outputs.git_commit }}
+            BUILD_VERSION=${{ steps.meta.outputs.tag_yymm }}
+          annotations: |
+            org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
+            org.opencontainers.image.version=latest
+            org.opencontainers.image.revision=${{ steps.meta.outputs.git_commit }}
+            org.opencontainers.image.title=${{ github.event.repository.name }}
+            org.opencontainers.image.description=Containerized version of ${{ github.event.repository.name }}
+            org.opencontainers.image.vendor=CasjaysDev
+            org.opencontainers.image.authors=CasjaysDev
+            org.opencontainers.image.licenses=WTFPL
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.vcs-type=Git
+            com.github.containers.toolbox=false
 ```
 
-`gen-dockerfile actions` regenerates this as `.gitea/workflows/build.yml` (or `build.$version.yml`) from the existing Dockerfile.
+For versioned builds (`gen-dockerfile actions` on a tagged version), the workflow is named `Build and Push <version>`, omits the schedule trigger, and pushes only that fixed version tag.
+
+### Hand-Crafted Workflow (`.gitea/workflows/docker.yaml`)
+
+The legacy `docker.yaml` in `.github/example/` is hand-crafted and kept for reference. It differs from the generated workflow: uses `catthehacker/ubuntu:act-latest` container, tag-pinned actions (`@v2`/`@v3`/`@v4`), `secrets.DOCKER_USERNAME` + `secrets.DOCKER_TOKEN`, and the old `steps.meta.outputs.*` pattern. Do not use this as a template for new containers — use `gen-dockerfile actions` instead.
 
 ---
 
