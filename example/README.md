@@ -19,7 +19,7 @@ dockermgr update example-new
 ## Install and run container
   
 ```shell
-dockerHome="/var/lib/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes"
+dockerHome="/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes"
 mkdir -p "$dockerHome"
 git clone "https://github.com/dockermgr/example-new" "$HOME/.local/share/CasjaysDev/dockermgr/example-new"
 cp -Rfva "$HOME/.local/share/CasjaysDev/dockermgr/example-new/volumes/." "$dockerHome/"
@@ -46,8 +46,8 @@ services:
       - TZ=America/New_York
       - HOSTNAME=example-new
     volumes:
-      - "/var/lib/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes/data:/data:z"
-      - "/var/lib/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes/config:/config:z"
+      - "/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes/data:/data:z"
+      - "/srv/$USER/docker/casjaysdevdocker/example-new/latest/volumes/config:/config:z"
     ports:
       - 80:80
     restart: always
